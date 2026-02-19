@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบคำนวณค่าไฟฟ้า Pro - History & Export</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --canva-purple: #7d2ae8;
+            --canva-blue: #00c4cc;
+            --canva-green: #00d285;
+            --canva-red: #ff4757;
+            --bg-color: #f6f9fc;
+            --card-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #2d3436;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        h2, h3 { 
+            margin-top: 0; 
+            color: var(--canva-purple); 
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        /* Form Styling */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 14px; color: #636e72; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #edf2f7;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: 'Kanit';
+            box-sizing: border-box;
+            transition: 0.3s;
+        }
+        input:focus { border-color: var(--canva-blue); outline: none; }
+
+        /* Button Styling */
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .full-btn { grid-column: span 2; }
+        
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            font-family: 'Kanit';
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-calc { background: var(--canva-blue); color: white; }
+        .btn-img { background: var(--canva-purple); color: white; }
+        .btn-excel { background: var(--canva-green); color: white; }
+        .btn-print { background: #2d3436; color: white; }
+        .btn-delete-all { background: transparent; color: var(--canva-red); border: 1px solid var(--canva-red); font-size: 12px; margin: 10px auto; width: auto; }
+        
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
+        button:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+
+        /* History Styling */
+        .history-list { max-height: 300px; overflow-y: auto; margin-top: 15px; }
+        .history-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            border-left: 5px solid var(--canva-blue);
+            transition: 0.2s;
+        }
+        .history-item:hover { background: #f1f5f9; border-left-color: var(--canva-purple); }
+        .history-info div { font-size: 14px; }
+        .history-info b { color: var(--canva-purple); }
+        .item-actions { display: flex; gap: 5px; }
+        .btn-item-del { background: #ffeef0; color: var(--canva-red); padding: 8px; border-radius: 8px; }
+
+        /* Receipt (Invoice) Styling */
+        #receipt-area {
+            background: white;
+            width: 100%;
+            display: none;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            margin-bottom: 30px;
+        }
+        .receipt-gradient { background: linear-gradient(90deg, var(--canva-purple), var(--canva-blue)); height: 10px; }
+        .receipt-body { padding: 30px; }
+        .receipt-header { text-align: center; margin-bottom: 25px; }
+        .receipt-header h1 { font-family: 'Montserrat', sans-serif; font-size: 28px; margin: 0; color: var(--canva-purple); }
+        
+        .row-data { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; font-size: 14px; }
+        .total-box { 
+            background: #f8fafc; 
+            padding: 20px; 
+            border-radius: 15px; 
+            text-align: center; 
+            margin-top: 20px; 
+            border: 2px dashed var(--canva-blue);
+        }
+        .total-box span { display: block; font-size: 14px; color: #636e72; }
+        .total-box b { font-family: 'Montserrat', sans-serif; font-size: 32px; color: var(--canva-purple); }
+
+        .footer-note { text-align: center; font-size: 11px; color: #cbd5e0; margin-top: 25px; }
+
+        /* Hide from print */
+        @media print {
+            body { padding: 0; background: white; }
+            .card, .btn-grid, h2, .footer-note, .history-card { display: none !important; }
+            #receipt-area { display: block !important; box-shadow: none; border: 1px solid #eee; width: 100%; max-width: 100%; position: absolute; top: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>⚡ คำนวณค่าไฟฟ้า</h2>
+        <div class="form-group">
+            <label>เลขจดมิเตอร์ครั้งก่อน (Unit)</label>
+            <input type="number" id="prevUnit" placeholder="เช่น 1500">
+        </div>
+        <div class="form-group">
+            <label>เลขจดมิเตอร์ครั้งนี้ (Unit)</label>
+            <input type="number" id="currUnit" placeholder="เช่น 1750">
+        </div>
+        <div class="form-group">
+            <label>ราคาต่อหน่วย (บาท)</label>
+            <input type="number" id="rate" value="4.50" step="0.01">
+        </div>
+        
+        <div class="btn-grid">
+            <button class="btn-calc full-btn" onclick="calculate()">✨ คำนวณเงิน & บันทึก</button>
+            <button class="btn-img" id="btn-img" onclick="exportImage()" disabled>🖼️ โหลดรูป</button>
+            <button class="btn-excel" id="btn-excel" onclick="exportExcel()" disabled>📊 Excel</button>
+            <button class="btn-print full-btn" id="btn-print" onclick="printReceipt()" disabled>🖨️ ปริ้น / PDF</button>
+        </div>
+    </div>
+
+    <!-- บิลใบเสร็จ -->
+    <div id="receipt-area">
+        <div class="receipt-gradient"></div>
+        <div class="receipt-body">
+            <div class="receipt-header">
+                <h1>INVOICE</h1>
+                <small id="res-id">#INV-000000</small>
+            </div>
+            
+            <div class="row-data"><span>วันที่:</span> <b id="res-date">-</b></div>
+            <div class="row-data"><span>เลขมิเตอร์ครั้งก่อน:</span> <span id="res-prev">-</span></div>
+            <div class="row-data"><span>เลขมิเตอร์ครั้งนี้:</span> <span id="res-curr">-</span></div>
+            <div class="row-data" style="color: var(--canva-blue); font-weight: bold;">
+                <span>จำนวนหน่วยที่ใช้:</span> <span id="res-unit">0 Units</span>
+            </div>
+            <div class="row-data"><span>ราคาต่อหน่วย:</span> <span id="res-rate">฿0.00</span></div>
+            
+            <div class="total-box">
+                <span>ยอดเงินที่ต้องชำระทั้งสิ้น</span>
+                <b id="res-total">฿0.00</b>
+            </div>
+            
+            <div class="footer-note">
+                ออกบิลโดยระบบอัตโนมัติเมื่อ: <span id="res-stamp">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ประวัติการใช้งาน -->
+    <div class="card history-card">
+        <h3>🕒 ประวัติย้อนหลัง</h3>
+        <div id="history-list" class="history-list">
+            <!-- Items populated by JS -->
+        </div>
+        <div style="text-align: center;">
+            <button class="btn-delete-all" onclick="clearAllHistory()">🗑️ ล้างประวัติทั้งหมด</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let historyData = JSON.parse(localStorage.getItem('electricity_history')) || [];
+    let currentItem = null;
+
+    window.onload = renderHistory;
+
+    function calculate() {
+        const prev = parseFloat(document.getElementById('prevUnit').value);
+        const curr = parseFloat(document.getElementById('currUnit').value);
+        const rate = parseFloat(document.getElementById('rate').value);
+
+        if (isNaN(prev) || isNaN(curr) || curr < prev) {
+            alert("⚠️ กรุณากรอกข้อมูลให้ถูกต้อง (เลขครั้งนี้ต้องไม่น้อยกว่าครั้งก่อน)");
+            return;
+        }
+
+        const units = curr - prev;
+        const total = units * rate;
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('th-TH');
+        const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        const id = 'INV-' + Date.now().toString().slice(-6);
+
+        currentItem = { id, date: dateStr, time: timeStr, prev, curr, rate, units, total };
+        
+        // Save to history
+        historyData.unshift(currentItem);
+        localStorage.setItem('electricity_history', JSON.stringify(historyData));
+        
+        displayReceipt(currentItem);
+        renderHistory();
+        scrollToReceipt();
+    }
+
+    function displayReceipt(item) {
+        currentItem = item;
+        document.getElementById('res-id').innerText = '#' + item.id;
+        document.getElementById('res-date').innerText = item.date + ' ' + item.time;
+        document.getElementById('res-prev').innerText = item.prev.toLocaleString();
+        document.getElementById('res-curr').innerText = item.curr.toLocaleString();
+        document.getElementById('res-unit').innerText = item.units.toLocaleString() + ' Units';
+        document.getElementById('res-rate').innerText = '฿' + item.rate.toFixed(2);
+        document.getElementById('res-total').innerText = '฿' + item.total.toLocaleString(undefined, {minimumFractionDigits: 2});
+        document.getElementById('res-stamp').innerText = item.date + ' ' + item.time;
+
+        document.getElementById('receipt-area').style.display = 'block';
+        
+        // Enable buttons
+        document.getElementById('btn-img').disabled = false;
+        document.getElementById('btn-excel').disabled = false;
+        document.getElementById('btn-print').disabled = false;
+    }
+
+    function renderHistory() {
+        const listDiv = document.getElementById('history-list');
+        if (historyData.length === 0) {
+            listDiv.innerHTML = '<p style="text-align:center; color:#999; font-size:14px;">ไม่มีประวัติการใช้งาน</p>';
+            return;
+        }
+
+        listDiv.innerHTML = historyData.map(item => `
+            <div class="history-item" onclick="viewItem('${item.id}')">
+                <div class="history-info">
+                    <div><b>${item.date}</b> (${item.time})</div>
+                    <div>ใช้ไป: <b>${item.units}</b> หน่วย | รวม: <b>฿${item.total.toLocaleString()}</b></div>
+                </div>
+                <div class="item-actions">
+                    <button class="btn-item-del" onclick="event.stopPropagation(); deleteItem('${item.id}')">ลบ</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function viewItem(id) {
+        const item = historyData.find(h => h.id === id);
+        if (item) {
+            displayReceipt(item);
+            scrollToReceipt();
+        }
+    }
+
+    function deleteItem(id) {
+        if(confirm('ลบรายการนี้ใช่หรือไม่?')) {
+            historyData = historyData.filter(h => h.id !== id);
+            localStorage.setItem('electricity_history', JSON.stringify(historyData));
+            renderHistory();
+            if (currentItem && currentItem.id === id) {
+                document.getElementById('receipt-area').style.display = 'none';
+                document.getElementById('btn-img').disabled = true;
+                document.getElementById('btn-excel').disabled = true;
+                document.getElementById('btn-print').disabled = true;
+            }
+        }
+    }
+
+    function clearAllHistory() {
+        if(confirm('⚠️ คุณต้องการลบประวัติทั้งหมดใช่หรือไม่?')) {
+            historyData = [];
+            localStorage.removeItem('electricity_history');
+            renderHistory();
+            document.getElementById('receipt-area').style.display = 'none';
+        }
+    }
+
+    function exportImage() {
+        const area = document.getElementById('receipt-area');
+        html2canvas(area, { scale: 3, backgroundColor: "#f6f9fc" }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `Bill-${currentItem.id}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    }
+
+    function exportExcel() {
+        let csv = "\ufeffID,Date,Time,Prev,Curr,Units,Rate,Total\n";
+        csv += `${currentItem.id},${currentItem.date},${currentItem.time},${currentItem.prev},${currentItem.curr},${currentItem.units},${currentItem.rate},${currentItem.total}\n`;
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Data-${currentItem.id}.csv`;
+        link.click();
+    }
+
+    function printReceipt() {
+        window.print();
+    }
+
+    function scrollToReceipt() {
+        document.getElementById('receipt-area').scrollIntoView({ behavior: 'smooth' });
+    }
+</script>
+
+</body>
+</html>
+
