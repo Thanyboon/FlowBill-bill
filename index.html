@@ -47,9 +47,6 @@
         .item-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
         .status-badge { font-size: 10px; padding: 4px 10px; border-radius: 20px; position: fixed; top: 10px; right: 10px; z-index: 1000; }
         
-        .btn-download { font-size: 12px; font-weight: 600; padding: 10px; transition: 0.2s; }
-        .btn-download:active { transform: scale(0.95); }
-
         @media (max-width: 768px) {
             .receipt-wrapper { flex-direction: column; align-items: center; background: transparent; padding: 0; gap: 15px; }
             .receipt-container { width: 100%; min-width: 100%; }
@@ -128,26 +125,11 @@
             </div>
         </div>
 
-        <div class="row g-2 mt-4">
-            <div class="col-12"><p class="small fw-bold text-muted mb-1 text-center">📸 ดาวน์โหลดเป็นรูปภาพ</p></div>
-            <div class="col-4">
-                <button onclick="saveImg('normal')" class="btn btn-outline-dark w-100 rounded-4 btn-download">
-                    📄 บิลปกติ
-                </button>
-            </div>
-            <div class="col-4">
-                <button onclick="saveImg('split')" class="btn btn-outline-primary w-100 rounded-4 btn-download">
-                    ✂️ บิลหาร
-                </button>
-            </div>
-            <div class="col-4">
-                <button onclick="saveImg('dual')" class="btn btn-primary w-100 rounded-4 btn-download">
-                    👯 รูปคู่
-                </button>
-            </div>
-            <div class="col-12 mt-2">
-                <button onclick="saveEx()" class="btn btn-outline-success w-100 rounded-pill small py-2">📊 ส่งออกไฟล์ Excel</button>
-            </div>
+        <div class="row g-2 mt-3">
+            <div class="col-4"><button onclick="saveImg('normal')" class="btn btn-outline-dark w-100 rounded-pill small">📸 บิลปกติ</button></div>
+            <div class="col-4"><button onclick="saveImg('split')" class="btn btn-outline-primary w-100 rounded-pill small">📸 บิลหาร</button></div>
+            <div class="col-4"><button onclick="saveImg('dual')" class="btn btn-primary w-100 rounded-pill small">📸 รูปคู่</button></div>
+            <div class="col-12 mt-2"><button onclick="saveEx()" class="btn btn-outline-success w-100 rounded-pill small py-2">📊 Excel</button></div>
         </div>
     </div>
 </div>
@@ -164,7 +146,14 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // Firebase Setup
+    // Splash Logic
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const splash = document.getElementById('splash-screen');
+            if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.style.display = 'none', 500); }
+        }, 2000);
+    });
+
     const firebaseConfig = { databaseURL: "https://mybillapp-99a67-default-rtdb.asia-southeast1.firebasedatabase.app" };
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
@@ -174,10 +163,6 @@
     window.onload = () => {
         document.getElementById('inp-date').valueAsDate = new Date();
         syncData();
-        setTimeout(() => {
-            const splash = document.getElementById('splash-screen');
-            if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.style.display = 'none', 500); }
-        }, 2000);
     };
 
     function switchTab(mode) {
@@ -200,7 +185,8 @@
     function saveToCloud() {
         const amt = +document.getElementById('totalDisplay').value;
         const id = Date.now();
-        let note = "", splitValue = 1;
+        let note = "";
+        let splitValue = 1;
         if(currentMode === 'finance') note = document.getElementById('desc').value || 'รายจ่าย';
         if(currentMode === 'electric') note = `ค่าไฟ (${(+document.getElementById('mNew').value - +document.getElementById('mOld').value)} ยูนิต)`;
         if(currentMode === 'receipt') { note = document.getElementById('rName').value || 'หารบิล'; splitValue = +document.getElementById('rSplit').value || 1; }
@@ -244,50 +230,50 @@
     function delItem(id) { if(confirm("ลบรายการ?")) database.ref('bills/' + id).remove(); }
     function resetForm() { ['desc','uPrice','mOld','mNew','rName','rPrice'].forEach(id => document.getElementById(id).value = ''); calc(); }
 
-    // ฟังก์ชันดาวน์โหลดรูปภาพ แยก 3 รูปแบบ
+    // ฟังก์ชันใหม่ที่แก้ปัญหาบิลขาดบนมือถือ
     async function saveImg(type) {
         const area = document.getElementById('capture-area');
-        const clone = area.cloneNode(true);
-        
-        // ตั้งค่าสไตล์พื้นฐานของตัว Clone
-        clone.style.position = 'fixed';
-        clone.style.top = '-9999px';
-        clone.style.left = '0';
-        clone.style.display = 'flex';
-        clone.style.flexDirection = 'row';
-        clone.style.gap = '15px';
-        clone.style.padding = '25px';
-        clone.style.borderRadius = '0px';
-
-        // ลบปุ่มออกจากตัวก๊อปปี้
-        clone.querySelectorAll('.item-row button').forEach(b => b.remove());
-
-        // ปรับแต่งตามประเภทที่เลือก
         let captureWidth = 340;
         let bgColor = "#ffffff";
-
-        if (type === 'normal') {
-            clone.querySelector('#receipt-split').remove();
-            clone.style.background = "#ffffff";
-        } else if (type === 'split') {
-            clone.querySelector('#receipt-normal').remove();
-            clone.style.background = "#ffffff";
-        } else if (type === 'dual') {
+        if (type === 'dual') {
             captureWidth = 680;
-            clone.style.background = "#cbd5e1"; // พื้นหลังสีเทาสำหรับรูปคู่
             bgColor = "#cbd5e1";
         }
 
-        clone.style.width = captureWidth + 'px';
-        document.body.appendChild(clone);
-
         try {
-            const canvas = await html2canvas(clone, { 
+            const canvas = await html2canvas(area, { 
                 scale: 3, 
                 backgroundColor: bgColor,
                 useCORS: true,
                 width: captureWidth,
-                windowWidth: captureWidth + 50
+                onclone: (clonedDoc) => {
+                    const clonedArea = clonedDoc.getElementById('capture-area');
+                    clonedArea.style.display = 'flex';
+                    clonedArea.style.flexDirection = 'row'; 
+                    clonedArea.style.flexWrap = 'nowrap'; 
+                    clonedArea.style.width = captureWidth + 'px';
+                    clonedArea.style.padding = '20px';
+                    clonedArea.style.background = bgColor;
+                    
+                    const bNormal = clonedDoc.getElementById('receipt-normal');
+                    const bSplit = clonedDoc.getElementById('receipt-split');
+                    
+                    if (type === 'normal') {
+                        bSplit.style.display = 'none';
+                        bNormal.style.display = 'block';
+                        bNormal.style.width = '320px';
+                    } else if (type === 'split') {
+                        bNormal.style.display = 'none';
+                        bSplit.style.display = 'block';
+                        bSplit.style.width = '320px';
+                    } else {
+                        bNormal.style.display = 'block';
+                        bSplit.style.display = 'block';
+                        bNormal.style.width = '320px';
+                        bSplit.style.width = '320px';
+                    }
+                    clonedArea.querySelectorAll('.item-row button').forEach(b => b.remove());
+                }
             });
 
             const link = document.createElement('a');
@@ -295,9 +281,8 @@
             link.href = canvas.toDataURL("image/png");
             link.click();
         } catch (e) {
+            console.error(e);
             alert("โหลดรูปไม่สำเร็จ");
-        } finally {
-            document.body.removeChild(clone);
         }
     }
 
