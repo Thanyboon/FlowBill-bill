@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>จดดี x FlowBill</title>
+    <title>จดดี x FlowBill v6.5</title>
 
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#1e293b">
     
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2910/2910321.png">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/mD3f4m0S/1000013111.png">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -25,23 +25,43 @@
     <style>
         :root { --primary: #1e293b; --accent: #3b82f6; --bg: #f8fafc; }
         body { background-color: var(--bg); font-family: 'Kanit', sans-serif; padding-bottom: 50px; }
+        
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f1f5f9; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 9999;
+            transition: opacity 0.5s ease-out;
+        }
+
         .main-card { max-width: 850px; margin: 10px auto; background: white; padding: 20px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         .nav-tabs-custom { background: #f1f5f9; border-radius: 15px; padding: 5px; display: flex; gap: 5px; margin-bottom: 20px; }
         .nav-link-custom { flex: 1; text-align: center; padding: 10px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 13px; color: #64748b; transition: 0.3s; }
         .nav-link-custom.active { background: white; color: var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .input-form { background: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #e2e8f0; }
-        .receipt-wrapper { display: flex; gap: 10px; background: #cbd5e1; padding: 10px; border-radius: 24px; overflow-x: auto; justify-content: center; }
+        
+        /* แก้ไขส่วน Receipt Wrapper ให้ยืดหยุ่นขึ้น */
+        .receipt-wrapper { 
+            display: flex; gap: 15px; background: #cbd5e1; padding: 15px; 
+            border-radius: 24px; overflow-x: auto; justify-content: center;
+            min-width: fit-content;
+        }
         .receipt-container { width: 320px; min-width: 320px; background: white; padding: 25px; border-radius: 20px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .item-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
         .status-badge { font-size: 10px; padding: 4px 10px; border-radius: 20px; position: fixed; top: 10px; right: 10px; z-index: 1000; }
         
         @media (max-width: 768px) {
-            .receipt-wrapper { flex-direction: column; align-items: center; background: transparent; padding: 0; gap: 15px; }
+            .receipt-wrapper { flex-direction: column; align-items: center; background: transparent; padding: 0; gap: 15px; min-width: 100%; }
             .receipt-container { width: 100%; min-width: 100%; }
         }
     </style>
 </head>
 <body>
+
+<div id="splash-screen">
+    <img src="https://i.postimg.cc/mD3f4m0S/1000013111.png" alt="Welcome" style="max-width: 70%; max-height: 50vh; margin-bottom: 20px;">
+    <h1 style="font-weight: 600; color: #1e293b;">จดดี</h1>
+    <p style="color: #64748b;">FlowBill v6.5</p>
+</div>
 
 <div id="syncStatus" class="status-badge bg-secondary text-white">กำลังเชื่อมต่อ...</div>
 
@@ -70,7 +90,7 @@
                     <select id="type" class="form-select form-select-sm">
                         <option value="expense">จ่าย (-)</option>
                         <option value="income">รับ (+)</option>
-                    </cselect>
+                    </select>
                 </div>
                 <div id="f-inputs" class="row g-2 m-0 mt-2">
                     <div class="col-12"><input type="text" id="desc" class="form-control" placeholder="รายการ เช่น ค่าข้าว"></div>
@@ -118,7 +138,7 @@
 <div class="modal fade" id="modalHistory" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0" style="border-radius: 25px;">
-            <div class="modal-header border-0"><h5 class="fw-bold">คลังบิลทั้งหมด</h5><button type="button" class="btn-close" onclick="bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide()"></button></div>
+            <div class="modal-header border-0"><h5 class="fw-bold">คลังบิลทั้งหมด</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body" id="historyList"></div>
         </div>
     </div>
@@ -127,16 +147,16 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // --- PWA Service Worker Registration ---
-if ('serviceWorker' in navigator) {
+    // Splash Logic
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('SW Registered'))
-            .catch(err => console.log('SW Failed', err));
+        setTimeout(() => {
+            const splash = document.getElementById('splash-screen');
+            splash.style.opacity = '0';
+            setTimeout(() => splash.style.display = 'none', 500);
+        }, 2000);
     });
-}
 
-    // --- Firebase & Logic ---
+    // Firebase
     const firebaseConfig = { databaseURL: "https://mybillapp-99a67-default-rtdb.asia-southeast1.firebasedatabase.app" };
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
@@ -167,7 +187,6 @@ if ('serviceWorker' in navigator) {
 
     function saveToCloud() {
         const amt = +document.getElementById('totalDisplay').value;
-        if(amt <= 0 && document.getElementById('type').value === 'expense') return alert("กรุณากรอกข้อมูล");
         const id = Date.now();
         let note = "", splitValue = 1;
         if(currentMode === 'finance') note = document.getElementById('desc').value || 'รายจ่าย';
@@ -181,11 +200,6 @@ if ('serviceWorker' in navigator) {
     }
 
     function syncData() {
-        database.ref('.info/connected').on('value', snap => {
-            const st = document.getElementById('syncStatus');
-            st.innerText = snap.val() ? "ออนไลน์" : "ออฟไลน์";
-            st.className = `status-badge ${snap.val() ? 'bg-success' : 'bg-danger'} text-white`;
-        });
         database.ref('bills').on('value', snap => {
             allItems = snap.val() ? Object.values(snap.val()) : [];
             renderUI();
@@ -213,35 +227,57 @@ if ('serviceWorker' in navigator) {
     function delItem(id) { if(confirm("ลบรายการ?")) database.ref('bills/' + id).remove(); }
     function resetForm() { ['desc','uPrice','mOld','mNew','rName','rPrice'].forEach(id => document.getElementById(id).value = ''); calc(); }
 
+    // แก้ไขฟังก์ชันบันทึกรูปภาพ
     async function saveImg(mode) {
-        document.querySelectorAll('.item-row button').forEach(b => b.style.visibility = 'hidden');
-        const target = mode === 'single' ? document.getElementById('receipt-normal') : document.getElementById('capture-area');
-        const originalStyle = document.getElementById('capture-area').style.flexDirection;
-        if(mode === 'dual' && window.innerWidth <= 768) document.getElementById('capture-area').style.flexDirection = 'row';
+        const area = document.getElementById('capture-area');
+        const target = mode === 'single' ? document.getElementById('receipt-normal') : area;
         
-        const canvas = await html2canvas(target, { scale: 3, backgroundColor: mode === 'dual' ? "#cbd5e1" : "#ffffff" });
-        document.getElementById('capture-area').style.flexDirection = originalStyle;
-        document.querySelectorAll('.item-row button').forEach(b => b.style.visibility = 'visible');
+        // ซ่อนปุ่มลบก่อนถ่ายรูป
+        document.querySelectorAll('.item-row button').forEach(b => b.style.display = 'none');
+        
+        // บังคับให้เป็นแนวนอนและขยายขนาดชั่วคราวเพื่อป้องกันรูปโดนตัด
+        const originalStyle = area.getAttribute('style') || "";
+        if(mode === 'dual') {
+            area.style.display = 'flex';
+            area.style.flexDirection = 'row';
+            area.style.width = '670px'; // 320px + 320px + gap
+            area.style.overflow = 'visible';
+        }
 
-        const link = document.createElement('a');
-        link.download = `Bill-${Date.now()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
+        try {
+            const canvas = await html2canvas(target, { 
+                scale: 3, 
+                backgroundColor: mode === 'dual' ? "#cbd5e1" : "#ffffff",
+                useCORS: true,
+                logging: false,
+                width: mode === 'dual' ? 670 : target.offsetWidth,
+                height: target.offsetHeight
+            });
+
+            const link = document.createElement('a');
+            link.download = `Bill-${Date.now()}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+        } catch (e) {
+            alert("เกิดข้อผิดพลาดในการบันทึกรูป");
+        } finally {
+            // คืนค่าเดิม
+            area.setAttribute('style', originalStyle);
+            document.querySelectorAll('.item-row button').forEach(b => b.style.display = 'inline-block');
+        }
     }
 
     function saveEx() {
-        const group = document.getElementById('billGroup').value;
-        const data = allItems.filter(i => i.group === group);
+        const data = allItems.filter(i => i.group === document.getElementById('billGroup').value);
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Bills");
-        XLSX.writeFile(wb, `Bills-${group}.xlsx`);
+        XLSX.writeFile(wb, `Bills-${Date.now()}.xlsx`);
     }
 
     function openHistory() {
         const groups = [...new Set(allItems.map(i => i.group))];
-        const hList = document.getElementById('historyList');
-        hList.innerHTML = groups.map(g => `<div class="p-3 border-bottom d-flex justify-content-between align-items-center" onclick="setGroup('${g}')" style="cursor:pointer;"><span class="fw-bold">${g}</span><span class="badge bg-primary rounded-pill">${allItems.filter(i => i.group === g).length}</span></div>`).join('') || 'ไม่มีข้อมูล';
+        document.getElementById('historyList').innerHTML = groups.map(g => `<div class="p-3 border-bottom d-flex justify-content-between align-items-center" onclick="setGroup('${g}')" style="cursor:pointer;"><b>${g}</b> <span class="badge bg-primary">${allItems.filter(i => i.group === g).length}</span></div>`).join('');
         new bootstrap.Modal(document.getElementById('modalHistory')).show();
     }
 
@@ -249,3 +285,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
