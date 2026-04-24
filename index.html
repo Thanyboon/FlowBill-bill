@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>จดดี x FlowBill</title>
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="จดดี">
+    <meta name="theme-color" content="#1e293b">
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2910/2910321.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root { --primary: #1e293b; --accent: #3b82f6; --bg: #f8fafc; }
+        body { background-color: var(--bg); font-family: 'Kanit', sans-serif; padding-bottom: 50px; }
+        .main-card { max-width: 850px; margin: 10px auto; background: white; padding: 20px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .nav-tabs-custom { background: #f1f5f9; border-radius: 15px; padding: 5px; display: flex; gap: 5px; margin-bottom: 20px; }
+        .nav-link-custom { flex: 1; text-align: center; padding: 10px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 13px; color: #64748b; transition: 0.3s; }
+        .nav-link-custom.active { background: white; color: var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .input-form { background: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #e2e8f0; }
+        .receipt-wrapper { display: flex; gap: 10px; background: #cbd5e1; padding: 10px; border-radius: 24px; overflow-x: auto; justify-content: center; }
+        .receipt-container { width: 320px; min-width: 320px; background: white; padding: 25px; border-radius: 20px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .item-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
+        .status-badge { font-size: 10px; padding: 4px 10px; border-radius: 20px; position: fixed; top: 10px; right: 10px; z-index: 1000; }
+        
+        @media (max-width: 768px) {
+            .receipt-wrapper { flex-direction: column; align-items: center; background: transparent; padding: 0; gap: 15px; }
+            .receipt-container { width: 100%; min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="syncStatus" class="status-badge bg-secondary text-white">กำลังเชื่อมต่อ...</div>
+
+<div class="container">
+    <div class="main-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold m-0">💰 จดดี <span class="text-primary">x FlowBill</span></h5>
+            <button onclick="openHistory()" class="btn btn-sm btn-outline-primary rounded-pill">📂 คลังบิล</button>
+        </div>
+
+        <div class="mb-3">
+            <label class="small fw-bold text-muted">ชื่อกลุ่ม/โปรเจกต์</label>
+            <input type="text" id="billGroup" value="บิลทั่วไป" onchange="renderUI()" class="form-control rounded-pill border-primary" style="font-weight: bold; color: #3b82f6;">
+        </div>
+
+        <div class="nav-tabs-custom">
+            <div id="t-finance" class="nav-link-custom active" onclick="switchTab('finance')">💸 รายจ่าย</div>
+            <div id="t-electric" class="nav-link-custom" onclick="switchTab('electric')">⚡ ค่าไฟ</div>
+            <div id="t-receipt" class="nav-link-custom" onclick="switchTab('receipt')">📄 หารบิล</div>
+        </div>
+
+        <div class="input-form mb-4">
+            <div class="row g-2">
+                <div class="col-6"><label class="small fw-bold">วันที่</label><input type="date" id="inp-date" class="form-control form-control-sm"></div>
+                <div class="col-6"><label class="small fw-bold">ประเภท</label>
+                    <select id="type" class="form-select form-select-sm">
+                        <option value="expense">จ่าย (-)</option>
+                        <option value="income">รับ (+)</option>
+                    </cselect>
+                </div>
+                <div id="f-inputs" class="row g-2 m-0 mt-2">
+                    <div class="col-12"><input type="text" id="desc" class="form-control" placeholder="รายการ เช่น ค่าข้าว"></div>
+                    <div class="col-6"><input type="number" id="uPrice" oninput="calc()" class="form-control text-center" placeholder="ราคา"></div>
+                    <div class="col-6"><input type="number" id="qty" oninput="calc()" class="form-control text-center" value="1"></div>
+                </div>
+                <div id="e-inputs" class="row g-2 m-0 mt-2 d-none">
+                    <div class="col-6"><input type="number" id="mOld" oninput="calc()" class="form-control text-center" placeholder="เลขเก่า"></div>
+                    <div class="col-6"><input type="number" id="mNew" oninput="calc()" class="form-control text-center" placeholder="เลขใหม่"></div>
+                    <div class="col-12"><input type="number" id="eRate" oninput="calc()" class="form-control text-center" value="7"></div>
+                </div>
+                <div id="r-inputs" class="row g-2 m-0 mt-2 d-none">
+                    <div class="col-12"><input type="text" id="rName" class="form-control" placeholder="รายการที่จะหาร"></div>
+                    <div class="col-6"><input type="number" id="rPrice" oninput="calc()" class="form-control text-center" placeholder="ราคารวม"></div>
+                    <div class="col-6"><input type="number" id="rSplit" oninput="calc()" class="form-control text-center" value="1" placeholder="หารกี่คน"></div>
+                </div>
+                <div class="col-12 mt-3">
+                    <input type="text" id="totalDisplay" class="form-control form-control-lg text-center fw-bold bg-white text-primary" readonly value="0.00">
+                    <button onclick="saveToCloud()" class="btn btn-primary w-100 rounded-pill mt-2 py-2 fw-bold">✅ บันทึก (Cloud)</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="capture-area" class="receipt-wrapper">
+            <div id="receipt-normal" class="receipt-container">
+                <div class="text-center border-bottom pb-2 mb-3"><h6 class="fw-bold mb-0">NORMAL RECEIPT</h6><small class="text-muted group-label-display"></small></div>
+                <div id="list-normal" style="min-height: 120px;"></div>
+                <div class="bg-dark text-white p-3 rounded-4 d-flex justify-content-between align-items-center mt-3"><span class="small">ยอดรวมสุทธิ</span><span id="total-normal" class="h5 m-0 fw-bold">0.00</span></div>
+            </div>
+            <div id="receipt-split" class="receipt-container">
+                <div class="text-center border-bottom pb-2 mb-3"><h6 class="fw-bold mb-0 text-primary">SPLIT RECEIPT</h6><small class="text-muted group-label-display"></small></div>
+                <div id="list-split" style="min-height: 120px;"></div>
+                <div class="bg-primary text-white p-3 rounded-4 d-flex justify-content-between align-items-center mt-3"><span class="small">ยอดหารต่อคน</span><span id="total-split" class="h5 m-0 fw-bold">0.00</span></div>
+            </div>
+        </div>
+
+        <div class="row g-2 mt-3">
+            <div class="col-4"><button onclick="saveImg('single')" class="btn btn-outline-dark w-100 rounded-pill small">📸 รูปเดี่ยว</button></div>
+            <div class="col-4"><button onclick="saveImg('dual')" class="btn btn-primary w-100 rounded-pill small">📸 รูปคู่</button></div>
+            <div class="col-4"><button onclick="saveEx()" class="btn btn-outline-success w-100 rounded-pill small">📊 Excel</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalHistory" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius: 25px;">
+            <div class="modal-header border-0"><h5 class="fw-bold">คลังบิลทั้งหมด</h5><button type="button" class="btn-close" onclick="bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide()"></button></div>
+            <div class="modal-body" id="historyList"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // --- PWA Service Worker Registration ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW Registered'))
+            .catch(err => console.log('SW Failed', err));
+    });
+}
+
+    // --- Firebase & Logic ---
+    const firebaseConfig = { databaseURL: "https://mybillapp-99a67-default-rtdb.asia-southeast1.firebasedatabase.app" };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    let allItems = [], currentMode = 'finance';
+
+    window.onload = () => {
+        document.getElementById('inp-date').valueAsDate = new Date();
+        syncData();
+    };
+
+    function switchTab(mode) {
+        currentMode = mode;
+        ['finance', 'electric', 'receipt'].forEach(m => {
+            document.getElementById(`t-${m}`).classList.toggle('active', m === mode);
+            document.getElementById(`${m.charAt(0)}-inputs`).classList.toggle('d-none', m !== mode);
+        });
+        calc();
+    }
+
+    function calc() {
+        let res = 0;
+        if(currentMode === 'finance') res = (+document.getElementById('uPrice').value || 0) * (+document.getElementById('qty').value || 1);
+        if(currentMode === 'electric') res = ((+document.getElementById('mNew').value || 0) - (+document.getElementById('mOld').value || 0)) * (+document.getElementById('eRate').value || 0);
+        if(currentMode === 'receipt') res = (+document.getElementById('rPrice').value || 0);
+        document.getElementById('totalDisplay').value = res.toFixed(2);
+    }
+
+    function saveToCloud() {
+        const amt = +document.getElementById('totalDisplay').value;
+        if(amt <= 0 && document.getElementById('type').value === 'expense') return alert("กรุณากรอกข้อมูล");
+        const id = Date.now();
+        let note = "", splitValue = 1;
+        if(currentMode === 'finance') note = document.getElementById('desc').value || 'รายจ่าย';
+        if(currentMode === 'electric') note = `ค่าไฟ (${(+document.getElementById('mNew').value - +document.getElementById('mOld').value)} ยูนิต)`;
+        if(currentMode === 'receipt') { note = document.getElementById('rName').value || 'หารบิล'; splitValue = +document.getElementById('rSplit').value || 1; }
+        
+        database.ref('bills/' + id).set({
+            id, group: document.getElementById('billGroup').value, note, amt, split: splitValue,
+            date: document.getElementById('inp-date').value, type: document.getElementById('type').value
+        }).then(() => resetForm());
+    }
+
+    function syncData() {
+        database.ref('.info/connected').on('value', snap => {
+            const st = document.getElementById('syncStatus');
+            st.innerText = snap.val() ? "ออนไลน์" : "ออฟไลน์";
+            st.className = `status-badge ${snap.val() ? 'bg-success' : 'bg-danger'} text-white`;
+        });
+        database.ref('bills').on('value', snap => {
+            allItems = snap.val() ? Object.values(snap.val()) : [];
+            renderUI();
+        });
+    }
+
+    function renderUI() {
+        const group = document.getElementById('billGroup').value;
+        document.querySelectorAll('.group-label-display').forEach(el => el.innerText = "GROUP: " + group);
+        const listN = document.getElementById('list-normal'), listS = document.getElementById('list-split');
+        listN.innerHTML = ''; listS.innerHTML = '';
+        let totalN = 0, totalS = 0;
+
+        allItems.filter(i => i.group === group).sort((a,b) => b.id - a.id).forEach(i => {
+            const isExp = i.type === 'expense';
+            const splitAmt = i.amt / (i.split || 1);
+            totalN += isExp ? -i.amt : i.amt; totalS += isExp ? -splitAmt : splitAmt;
+            const row = (val) => `<div class="item-row"><div><b style="font-size:12px">${i.note}</b><br><small class="text-muted" style="font-size:9px">${i.date}</small></div><div class="text-end"><span class="fw-bold ${isExp?'text-danger':'text-success'}">${isExp?'-':'+'}${val.toLocaleString()}</span><br><button onclick="delItem(${i.id})" class="btn btn-link p-0 text-muted" style="font-size:9px;">ลบ</button></div></div>`;
+            listN.innerHTML += row(i.amt); listS.innerHTML += row(splitAmt);
+        });
+        document.getElementById('total-normal').innerText = totalN.toLocaleString();
+        document.getElementById('total-split').innerText = totalS.toLocaleString();
+    }
+
+    function delItem(id) { if(confirm("ลบรายการ?")) database.ref('bills/' + id).remove(); }
+    function resetForm() { ['desc','uPrice','mOld','mNew','rName','rPrice'].forEach(id => document.getElementById(id).value = ''); calc(); }
+
+    async function saveImg(mode) {
+        document.querySelectorAll('.item-row button').forEach(b => b.style.visibility = 'hidden');
+        const target = mode === 'single' ? document.getElementById('receipt-normal') : document.getElementById('capture-area');
+        const originalStyle = document.getElementById('capture-area').style.flexDirection;
+        if(mode === 'dual' && window.innerWidth <= 768) document.getElementById('capture-area').style.flexDirection = 'row';
+        
+        const canvas = await html2canvas(target, { scale: 3, backgroundColor: mode === 'dual' ? "#cbd5e1" : "#ffffff" });
+        document.getElementById('capture-area').style.flexDirection = originalStyle;
+        document.querySelectorAll('.item-row button').forEach(b => b.style.visibility = 'visible');
+
+        const link = document.createElement('a');
+        link.download = `Bill-${Date.now()}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+    }
+
+    function saveEx() {
+        const group = document.getElementById('billGroup').value;
+        const data = allItems.filter(i => i.group === group);
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Bills");
+        XLSX.writeFile(wb, `Bills-${group}.xlsx`);
+    }
+
+    function openHistory() {
+        const groups = [...new Set(allItems.map(i => i.group))];
+        const hList = document.getElementById('historyList');
+        hList.innerHTML = groups.map(g => `<div class="p-3 border-bottom d-flex justify-content-between align-items-center" onclick="setGroup('${g}')" style="cursor:pointer;"><span class="fw-bold">${g}</span><span class="badge bg-primary rounded-pill">${allItems.filter(i => i.group === g).length}</span></div>`).join('') || 'ไม่มีข้อมูล';
+        new bootstrap.Modal(document.getElementById('modalHistory')).show();
+    }
+
+    function setGroup(g) { document.getElementById('billGroup').value = g; renderUI(); bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide(); }
+</script>
+</body>
+</html>
