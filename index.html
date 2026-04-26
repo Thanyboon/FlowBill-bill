@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#1e293b">
     
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="https://tropical-yellow-hgpekdwdsw.edgeone.app">
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/T-Thanyaboon/image-storage/main/app-icon.png">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -39,8 +39,9 @@
         .nav-link-custom.active { background: white; color: var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .input-form { background: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #e2e8f0; }
         
+        /* สไตล์สำหรับการแสดงผลบนหน้าเว็บ */
         .receipt-wrapper { 
-            display: flex; gap: 15px; background: #cbd5e1; padding: 15px; 
+            display: flex; gap: 15px; background: #cbd5e1; padding: 20px; 
             border-radius: 24px; overflow-x: auto; justify-content: center;
         }
         .receipt-container { width: 320px; min-width: 320px; background: white; padding: 25px; border-radius: 20px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -56,7 +57,7 @@
 <body>
 
 <div id="splash-screen">
-    <img src="https://tropical-yellow-hgpekdwdsw.edgeone.app" alt="Welcome" style="max-width: 85%; height: auto; border-radius: 30px; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+    <img src="https://raw.githubusercontent.com/T-Thanyaboon/image-storage/main/app-icon.png" alt="Welcome" style="max-width: 85%; height: auto; border-radius: 30px; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
     <h1 style="font-weight: 600; color: #1e293b; margin-top: 10px;">จดดี</h1>
     <p style="color: #64748b;">FlowBill v6.7</p>
 </div>
@@ -146,11 +147,15 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    // Splash Screen logic
     window.addEventListener('load', () => {
         setTimeout(() => {
             const splash = document.getElementById('splash-screen');
-            if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.style.display = 'none', 500); }
-        }, 2000);
+            if(splash) { 
+                splash.style.opacity = '0'; 
+                setTimeout(() => splash.style.display = 'none', 500); 
+            }
+        }, 1500);
     });
 
     const firebaseConfig = { databaseURL: "https://mybillapp-99a67-default-rtdb.asia-southeast1.firebasedatabase.app" };
@@ -231,45 +236,41 @@
 
     async function saveImg(type) {
         const area = document.getElementById('capture-area');
-        let captureWidth = 340;
-        let bgColor = (type === 'dual') ? "#cbd5e1" : "#ffffff";
         
-        if (type === 'dual') captureWidth = 680;
-
+        // ล็อกขนาดจำลองตอนเซฟรูป
+        const captureSettings = {
+            normal: { width: 360, showN: true, showS: false },
+            split: { width: 360, showN: false, showS: true },
+            dual: { width: 720, showN: true, showS: true }
+        };
+        const settings = captureSettings[type];
+        
         try {
             const canvas = await html2canvas(area, { 
-                scale: 3, 
-                backgroundColor: bgColor,
+                scale: 2.5, // ความชัด
+                backgroundColor: "#cbd5e1",
                 useCORS: true,
-                width: captureWidth,
                 onclone: (clonedDoc) => {
                     const clonedArea = clonedDoc.getElementById('capture-area');
+                    // บังคับ Layout เป็นแถวนอนเสมอตอนเซฟ
                     clonedArea.style.display = 'flex';
-                    clonedArea.style.flexDirection = 'row'; 
-                    clonedArea.style.flexWrap = 'nowrap'; 
-                    clonedArea.style.width = captureWidth + 'px';
+                    clonedArea.style.flexDirection = 'row';
+                    clonedArea.style.flexWrap = 'nowrap';
+                    clonedArea.style.width = settings.width + 'px';
                     clonedArea.style.padding = '20px';
-                    clonedArea.style.background = bgColor;
                     clonedArea.style.justifyContent = 'center';
+                    clonedArea.style.overflow = 'hidden';
 
                     const bNormal = clonedDoc.getElementById('receipt-normal');
                     const bSplit = clonedDoc.getElementById('receipt-split');
                     
-                    if (type === 'normal') {
-                        bSplit.style.display = 'none';
-                        bNormal.style.display = 'block';
-                        bNormal.style.width = '320px';
-                    } else if (type === 'split') {
-                        bNormal.style.display = 'none';
-                        bSplit.style.display = 'block';
-                        bSplit.style.width = '320px';
-                    } else {
-                        bNormal.style.display = 'block';
-                        bSplit.style.display = 'block';
-                        bNormal.style.width = '320px';
-                        bSplit.style.width = '320px';
-                        bNormal.style.marginRight = '15px';
-                    }
+                    bNormal.style.display = settings.showN ? 'block' : 'none';
+                    bSplit.style.display = settings.showS ? 'block' : 'none';
+                    
+                    if(settings.showN) { bNormal.style.width = '320px'; bNormal.style.minWidth = '320px'; }
+                    if(settings.showS) { bSplit.style.width = '320px'; bSplit.style.minWidth = '320px'; }
+                    if(type === 'dual') bNormal.style.marginRight = '15px';
+
                     clonedArea.querySelectorAll('.item-row button').forEach(b => b.remove());
                 }
             });
@@ -277,12 +278,10 @@
             const link = document.createElement('a');
             link.download = `Bill-${type}-${Date.now()}.png`;
             link.href = canvas.toDataURL("image/png");
-            document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
         } catch (e) {
             console.error(e);
-            alert("ไม่สามารถสร้างรูปภาพได้ในขณะนี้");
+            alert("บันทึกรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
         }
     }
 
