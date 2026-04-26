@@ -28,7 +28,7 @@
         
         #splash-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #f1f5f9; display: flex; flex-direction: column;
+            background-color: #ffffff; display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 9999;
             transition: opacity 0.5s ease-out;
         }
@@ -39,6 +39,7 @@
         .nav-link-custom.active { background: white; color: var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .input-form { background: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #e2e8f0; }
         
+        /* แก้ไข layout ให้รองรับการถ่ายรูป */
         .receipt-wrapper { 
             display: flex; gap: 15px; background: #cbd5e1; padding: 15px; 
             border-radius: 24px; overflow-x: auto; justify-content: center;
@@ -56,7 +57,7 @@
 <body>
 
 <div id="splash-screen">
-    <img src="https://i.postimg.cc/mD3f4m0S/1000013111.png" alt="Welcome" style="max-width: 70%; max-height: 50vh; margin-bottom: 20px;">
+    <img src="https://i.postimg.cc/mD3f4m0S/1000013111.png" alt="Welcome" style="max-width: 80%; height: auto; margin-bottom: 20px;">
     <h1 style="font-weight: 600; color: #1e293b;">จดดี</h1>
     <p style="color: #64748b;">FlowBill v6.7</p>
 </div>
@@ -230,15 +231,13 @@
     function delItem(id) { if(confirm("ลบรายการ?")) database.ref('bills/' + id).remove(); }
     function resetForm() { ['desc','uPrice','mOld','mNew','rName','rPrice'].forEach(id => document.getElementById(id).value = ''); calc(); }
 
-    // ฟังก์ชันใหม่ที่แก้ปัญหาบิลขาดบนมือถือ
+    // แก้ไขปัญหาดาวน์โหลดรูปไม่ได้และรูปคู่ขาดครึ่งบนมือถือ
     async function saveImg(type) {
         const area = document.getElementById('capture-area');
         let captureWidth = 340;
-        let bgColor = "#ffffff";
-        if (type === 'dual') {
-            captureWidth = 680;
-            bgColor = "#cbd5e1";
-        }
+        let bgColor = (type === 'dual') ? "#cbd5e1" : "#ffffff";
+        
+        if (type === 'dual') captureWidth = 680;
 
         try {
             const canvas = await html2canvas(area, { 
@@ -248,16 +247,20 @@
                 width: captureWidth,
                 onclone: (clonedDoc) => {
                     const clonedArea = clonedDoc.getElementById('capture-area');
+                    
+                    // บังคับ Layout แนวนอนในตัวก๊อปปี้
                     clonedArea.style.display = 'flex';
                     clonedArea.style.flexDirection = 'row'; 
                     clonedArea.style.flexWrap = 'nowrap'; 
                     clonedArea.style.width = captureWidth + 'px';
                     clonedArea.style.padding = '20px';
                     clonedArea.style.background = bgColor;
-                    
+                    clonedArea.style.justifyContent = 'center';
+
                     const bNormal = clonedDoc.getElementById('receipt-normal');
                     const bSplit = clonedDoc.getElementById('receipt-split');
                     
+                    // บังคับขนาดบิลในตัวก๊อปปี้ให้คงที่
                     if (type === 'normal') {
                         bSplit.style.display = 'none';
                         bNormal.style.display = 'block';
@@ -271,7 +274,10 @@
                         bSplit.style.display = 'block';
                         bNormal.style.width = '320px';
                         bSplit.style.width = '320px';
+                        bNormal.style.marginRight = '15px';
                     }
+                    
+                    // ลบปุ่มลบออกในรูป
                     clonedArea.querySelectorAll('.item-row button').forEach(b => b.remove());
                 }
             });
@@ -279,10 +285,12 @@
             const link = document.createElement('a');
             link.download = `Bill-${type}-${Date.now()}.png`;
             link.href = canvas.toDataURL("image/png");
+            document.body.appendChild(link); // เพิ่ม link ลงใน body เพื่อให้ Safari/Chrome มือถือกดได้
             link.click();
+            document.body.removeChild(link);
         } catch (e) {
             console.error(e);
-            alert("โหลดรูปไม่สำเร็จ");
+            alert("ไม่สามารถสร้างรูปภาพได้ในขณะนี้");
         }
     }
 
