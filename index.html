@@ -192,6 +192,9 @@
     }
 
     function saveToCloud() {
+        const btn = event.target; // ดึงตัวปุ่มที่กดมา
+        const originalText = btn.innerHTML;
+        
         const amt = +document.getElementById('totalDisplay').value;
         const id = Date.now();
         let note = "";
@@ -205,7 +208,15 @@
             date: document.getElementById('inp-date').value, type: document.getElementById('type').value
         }).then(() => {
             resetForm();
-            alert("บันทึกสำเร็จ!");
+            
+            // แสดงสถานะที่ปุ่มแทน Alert
+            btn.innerHTML = "✅ บันทึกแล้ว!";
+            btn.classList.replace('btn-primary', 'btn-success');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.replace('btn-success', 'btn-primary');
+            }, 2000); // ให้ปุ่มกลับมาเป็นเหมือนเดิมหลังจาก 2 วินาที
         });
     }
 
