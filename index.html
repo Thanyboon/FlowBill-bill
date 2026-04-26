@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#1e293b">
     
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="https://i.postimg.cc/mD3f4m0S/1000013111.png">
+    <link rel="apple-touch-icon" href="https://tropical-yellow-hgpekdwdsw.edgeone.app">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -39,7 +39,6 @@
         .nav-link-custom.active { background: white; color: var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .input-form { background: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #e2e8f0; }
         
-        /* แก้ไข layout ให้รองรับการถ่ายรูป */
         .receipt-wrapper { 
             display: flex; gap: 15px; background: #cbd5e1; padding: 15px; 
             border-radius: 24px; overflow-x: auto; justify-content: center;
@@ -57,8 +56,8 @@
 <body>
 
 <div id="splash-screen">
-    <img src="https://i.postimg.cc/mD3f4m0S/1000013111.png" alt="Welcome" style="max-width: 80%; height: auto; margin-bottom: 20px;">
-    <h1 style="font-weight: 600; color: #1e293b;">จดดี</h1>
+    <img src="https://tropical-yellow-hgpekdwdsw.edgeone.app" alt="Welcome" style="max-width: 85%; height: auto; border-radius: 30px; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+    <h1 style="font-weight: 600; color: #1e293b; margin-top: 10px;">จดดี</h1>
     <p style="color: #64748b;">FlowBill v6.7</p>
 </div>
 
@@ -147,7 +146,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // Splash Logic
     window.addEventListener('load', () => {
         setTimeout(() => {
             const splash = document.getElementById('splash-screen');
@@ -231,7 +229,6 @@
     function delItem(id) { if(confirm("ลบรายการ?")) database.ref('bills/' + id).remove(); }
     function resetForm() { ['desc','uPrice','mOld','mNew','rName','rPrice'].forEach(id => document.getElementById(id).value = ''); calc(); }
 
-    // แก้ไขปัญหาดาวน์โหลดรูปไม่ได้และรูปคู่ขาดครึ่งบนมือถือ
     async function saveImg(type) {
         const area = document.getElementById('capture-area');
         let captureWidth = 340;
@@ -247,8 +244,6 @@
                 width: captureWidth,
                 onclone: (clonedDoc) => {
                     const clonedArea = clonedDoc.getElementById('capture-area');
-                    
-                    // บังคับ Layout แนวนอนในตัวก๊อปปี้
                     clonedArea.style.display = 'flex';
                     clonedArea.style.flexDirection = 'row'; 
                     clonedArea.style.flexWrap = 'nowrap'; 
@@ -260,7 +255,6 @@
                     const bNormal = clonedDoc.getElementById('receipt-normal');
                     const bSplit = clonedDoc.getElementById('receipt-split');
                     
-                    // บังคับขนาดบิลในตัวก๊อปปี้ให้คงที่
                     if (type === 'normal') {
                         bSplit.style.display = 'none';
                         bNormal.style.display = 'block';
@@ -276,8 +270,6 @@
                         bSplit.style.width = '320px';
                         bNormal.style.marginRight = '15px';
                     }
-                    
-                    // ลบปุ่มลบออกในรูป
                     clonedArea.querySelectorAll('.item-row button').forEach(b => b.remove());
                 }
             });
@@ -285,7 +277,7 @@
             const link = document.createElement('a');
             link.download = `Bill-${type}-${Date.now()}.png`;
             link.href = canvas.toDataURL("image/png");
-            document.body.appendChild(link); // เพิ่ม link ลงใน body เพื่อให้ Safari/Chrome มือถือกดได้
+            document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         } catch (e) {
