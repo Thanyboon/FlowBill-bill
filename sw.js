@@ -1,8 +1,11 @@
-const cacheName = 'flowbill-v7';
-const staticAssets = ['./', './index.html'];
+const cacheName = 'flowbill-v10'; // เปลี่ยนเลขเวอร์ชั่นตรงนี้
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(clients.claim()); // บังคับให้เริ่มทำงานทันที
 });
 
 self.addEventListener('fetch', (event) => {
