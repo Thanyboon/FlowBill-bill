@@ -70,7 +70,7 @@
 <div class="container mt-2">
     <div class="main-card">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4 class="fw-bold m-0 text-primary">FlowBill <span class="text-dark">v8.0</span></h4>
+            <h4 class="fw-bold m-0 text-primary">FlowBill <span class="text-dark">v8.1</span></h4>
             <div class="d-flex gap-2">
                 <button onclick="createNewBill()" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm">➕ เพิ่มบิลใหม่</button>
                 <button onclick="openHistory()" class="btn btn-sm btn-outline-primary rounded-pill px-3">📂 คลังบิล</button>
@@ -154,7 +154,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // --- ลงทะเบียน Service Worker ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
@@ -241,14 +240,29 @@
         document.getElementById('total-split').innerText = tS.toLocaleString(undefined, {minimumFractionDigits: 2});
     }
 
-    // --- ฟังก์ชันลบกลุ่ม (ฉบับแก้ค้าง) ---
+    function editItem(id) {
+        const i = allItems.find(item => item.id == id);
+        if(!i) return;
+        document.getElementById('editingId').value = i.id;
+        document.getElementById('billGroup').value = i.group;
+        document.getElementById('inp-date').value = i.date;
+        document.getElementById('type').value = i.type;
+        switchTab(i.raw.mode);
+        if(i.raw.mode === 'finance') { document.getElementById('desc').value = i.note; document.getElementById('uPrice').value = i.raw.uPrice; document.getElementById('qty').value = i.raw.qty; }
+        if(i.raw.mode === 'electric') { document.getElementById('mOld').value = i.raw.mOld; document.getElementById('mNew').value = i.raw.mNew; document.getElementById('eRate').value = i.raw.eRate; }
+        if(i.raw.mode === 'receipt') { document.getElementById('rName').value = i.note; document.getElementById('rPrice').value = i.raw.rPrice; document.getElementById('rSplit').value = i.raw.rSplit; }
+        calc();
+        window.scrollTo(0,0);
+    }
+
     function deleteGroup(gName) {
         if(confirm(`⚠️ ลบบิลกลุ่ม "${gName}" ทั้งหมด?`)) {
             const updates = {};
             allItems.filter(i => i.group === gName).forEach(item => { updates[`/bills/${item.id}`] = null; });
             database.ref().update(updates).then(() => {
                 if(document.getElementById('billGroup').value === gName) document.getElementById('billGroup').value = "บิลทั่วไป";
-                const modal = bootstrap.Modal.getInstance(document.getElementById('modalHistory'));
+                const modalEl = document.getElementById('modalHistory');
+                const modal = bootstrap.Modal.getInstance(modalEl);
                 if(modal) modal.hide();
                 document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
                 document.body.classList.remove('modal-open');
@@ -284,8 +298,56 @@
     
     function delItem(id) { if(confirm("ลบรายการนี้?")) database.ref('bills/' + id).remove(); }
     function createNewBill() { if(confirm("ล้างข้อมูลเพื่อเริ่มบิลใหม่?")) { resetForm(); document.getElementById('billGroup').value = "บิลใหม่"; renderUI(); } }
-    async function saveImg(t) { /* โค้ด Capture รูปเดิม */ }
-    function saveEx() { /* โค้ด Excel เดิม */ }
+
+    // --- ฟังก์ชันบันทึกรูปภาพ (รองรับ PWA/iOS/Android) ---
+    async function saveImg(t) {
+        const area = document.getElementById('capture-area');
+        const set = { 
+            normal: { w: 340, n: true, s: false }, 
+            split: { w: 340, n: false, s: true }, 
+            dual: { w: 700, n: true, s: true } 
+        }[t];
+
+        try {
+            const canvas = await html2canvas(area, { 
+                scale: 3, useCORS: true, logging: false, backgroundColor: "#cbd5e1",
+                onclone: (cloned) => {
+                    const cArea = cloned.getElementById('capture-area');
+                    cArea.style.display = 'flex'; 
+                    cArea.style.padding = '20px';
+                    cArea.style.width = set.w + 'px';
+                    cloned.getElementById('receipt-normal').style.display = set.n ? 'block' : 'none';
+                    cloned.getElementById('receipt-split').style.display = set.s ? 'block' : 'none';
+                    cloned.querySelectorAll('.item-row div:last-child div').forEach(b => b.style.display = 'none');
+                }
+            });
+
+            const dataUrl = canvas.toDataURL("image/png");
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `FlowBill-${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // สำหรับ iOS PWA ที่บล็อกดาวน์โหลด: เปิดรูปในหน้าใหม่ให้เซฟเอง
+            if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+                const newWin = window.open();
+                newWin.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${dataUrl}" style="max-width:100%;"><p style="position:fixed; bottom:20px; color:white; font-family:sans-serif;">กดค้างที่รูปเพื่อบันทึกไปยังเครื่อง</p></body>`);
+            }
+        } catch (err) { alert("Error: " + err); }
+    }
+
+    function saveEx() {
+        const group = document.getElementById('billGroup').value;
+        const data = allItems.filter(i => i.group === group).map(i => ({
+            "วันที่": i.date, "รายการ": i.note, "ประเภท": i.type === 'expense' ? 'รายจ่าย' : 'รายรับ', "จำนวนเงิน": i.amt, "หารต่อคน": (i.amt / i.split).toFixed(2)
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Bills");
+        XLSX.writeFile(wb, `FlowBill-${group}.xlsx`);
+    }
 </script>
 </body>
 </html>
