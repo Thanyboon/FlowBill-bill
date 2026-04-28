@@ -1,7 +1,7 @@
 {
   "name": "FlowBill",
   "short_name": "FlowBill",
-  "start_url": "index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1e293b",
@@ -10,14 +10,12 @@
     {
       "src": "https://cdn.phototourl.com/free/2026-04-26-8b56e238-708c-4dc5-9c40-2c8c57f2e298.jpg",
       "sizes": "192x192",
-      "type": "image/jpg",
-      "purpose": "any maskable"
+      "type": "image/jpeg"
     },
     {
       "src": "https://cdn.phototourl.com/free/2026-04-26-8b56e238-708c-4dc5-9c40-2c8c57f2e298.jpg",
       "sizes": "512x512",
-      "type": "image/jpg",
-      "purpose": "any maskable"
+      "type": "image/jpeg"
     }
   ]
 }
