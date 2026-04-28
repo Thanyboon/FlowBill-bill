@@ -13,7 +13,6 @@
 
     <link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-04-26-8b56e238-708c-4dc5-9c40-2c8c57f2e298.jpg">
     <link rel="icon" type="image/jpg" href="https://cdn.phototourl.com/free/2026-04-26-8b56e238-708c-4dc5-9c40-2c8c57f2e298.jpg">
-    <link rel="manifest" href="manifest.json">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -70,7 +69,7 @@
 <div class="container mt-2">
     <div class="main-card">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4 class="fw-bold m-0 text-primary">FlowBill <span class="text-dark">v7.7</span></h4>
+            <h4 class="fw-bold m-0 text-primary">FlowBill <span class="text-dark">v7.8</span></h4>
             <div class="d-flex gap-2">
                 <button onclick="createNewBill()" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm">➕ เพิ่มบิลใหม่</button>
                 <button onclick="openHistory()" class="btn btn-sm btn-outline-primary rounded-pill px-3">📂 คลังบิล</button>
@@ -78,7 +77,7 @@
         </div>
 
         <div class="mb-3">
-            <label class="small fw-bold text-muted">ชื่อกลุ่ม/โปรเจกต์ (เช่น ชื่อเพื่อน หรือ ชื่อทริป)</label>
+            <label class="small fw-bold text-muted">ชื่อกลุ่ม/โปรเจกต์</label>
             <input type="text" id="billGroup" value="บิลทั่วไป" onchange="renderUI()" class="form-control rounded-pill border-primary fw-bold text-primary text-center">
         </div>
 
@@ -154,13 +153,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    window.addEventListener('load', () => {
-        setTimeout(() => {
-            const splash = document.getElementById('splash-screen');
-            if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.style.display = 'none', 500); }
-        }, 1200);
-    });
-
     const firebaseConfig = { databaseURL: "https://mybillapp-99a67-default-rtdb.asia-southeast1.firebasedatabase.app" };
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
@@ -168,6 +160,10 @@
     let allItems = [], currentMode = 'finance';
 
     window.onload = () => {
+        setTimeout(() => {
+            const splash = document.getElementById('splash-screen');
+            if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.style.display = 'none', 500); }
+        }, 1200);
         document.getElementById('inp-date').valueAsDate = new Date();
         syncData();
     };
@@ -177,7 +173,6 @@
             resetForm();
             document.getElementById('billGroup').value = "บิลใหม่";
             renderUI();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }
 
@@ -200,17 +195,15 @@
 
     function saveToCloud() {
         const btn = document.getElementById('saveBtn');
-        const originalText = btn.innerHTML;
-        const editingId = document.getElementById('editingId').value;
+        const id = document.getElementById('editingId').value || Date.now();
         const amt = +document.getElementById('totalDisplay').value;
-        const id = editingId ? editingId : Date.now(); 
-        
-        let note = "";
+        let note = "รายการ";
         let splitValue = 1;
+
         if(currentMode === 'finance') note = document.getElementById('desc').value || 'รายจ่าย';
-        if(currentMode === 'electric') note = `ค่าไฟ (${(+document.getElementById('mNew').value - +document.getElementById('mOld').value)} ยูนิต)`;
+        if(currentMode === 'electric') note = `ค่าไฟ (${(+document.getElementById('mNew').value - +document.getElementById('mOld').value)} ยู)`;
         if(currentMode === 'receipt') { note = document.getElementById('rName').value || 'หารบิล'; splitValue = +document.getElementById('rSplit').value || 1; }
-        
+
         database.ref('bills/' + id).set({
             id, group: document.getElementById('billGroup').value, note, amt, split: splitValue,
             date: document.getElementById('inp-date').value, type: document.getElementById('type').value,
@@ -222,13 +215,64 @@
             }
         }).then(() => {
             resetForm();
-            btn.innerHTML = editingId ? "✅ อัปเดตแล้ว!" : "✅ บันทึกแล้ว!";
-            btn.classList.replace('btn-primary', 'btn-success');
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.classList.replace('btn-success', 'btn-primary');
-            }, 2000);
+            btn.innerHTML = "✅ เรียบร้อย!";
+            btn.className = "btn btn-success w-100 rounded-pill mt-2 py-2";
+            setTimeout(() => { btn.innerHTML = "✅ บันทึกรายการ"; btn.className = "btn btn-primary w-100 rounded-pill mt-2 py-2 shadow-sm"; }, 2000);
         });
+    }
+
+    function syncData() {
+        database.ref('.info/connected').on('value', snap => {
+            const st = document.getElementById('syncStatus');
+            st.innerText = snap.val() ? "ออนไลน์" : "ออฟไลน์";
+            st.className = `status-badge ${snap.val() ? 'bg-success' : 'bg-danger'} text-white`;
+        });
+        database.ref('bills').on('value', snap => {
+            allItems = snap.val() ? Object.values(snap.val()) : [];
+            renderUI();
+        });
+    }
+
+    function renderUI() {
+        const group = document.getElementById('billGroup').value;
+        document.querySelectorAll('.group-label-display').forEach(el => el.innerText = "GROUP: " + group);
+        const listN = document.getElementById('list-normal'), listS = document.getElementById('list-split');
+        listN.innerHTML = ''; listS.innerHTML = '';
+        let tN = 0, tS = 0;
+
+        allItems.filter(i => i.group === group).sort((a,b) => b.id - a.id).forEach(i => {
+            const isExp = i.type === 'expense';
+            const sAmt = i.amt / (i.split || 1);
+            tN += isExp ? -i.amt : i.amt; tS += isExp ? -sAmt : sAmt;
+            const row = (v) => `<div class="item-row"><div><b style="font-size:12px">${i.note}</b><br><small class="text-muted" style="font-size:9px">${i.date}</small></div><div class="text-end"><span class="fw-bold ${isExp?'text-danger':'text-success'}">${isExp?'-':'+'}${v.toLocaleString()}</span><br><div style="display:flex; gap:8px; justify-content: flex-end;"><span onclick="editItem(${i.id})" class="text-primary" style="font-size:10px; cursor:pointer;">แก้ไข</span><span onclick="delItem(${i.id})" class="text-muted" style="font-size:10px; cursor:pointer;">ลบ</span></div></div></div>`;
+            listN.innerHTML += row(i.amt); listS.innerHTML += row(sAmt);
+        });
+        document.getElementById('total-normal').innerText = tN.toLocaleString(undefined, {minimumFractionDigits: 2});
+        document.getElementById('total-split').innerText = tS.toLocaleString(undefined, {minimumFractionDigits: 2});
+    }
+
+    function delItem(id) { if(confirm("ลบรายการนี้?")) database.ref('bills/' + id).remove(); }
+
+    function deleteGroup(gName) {
+        if(confirm(`⚠️ ลบบิลกลุ่ม "${gName}" ทั้งหมด?`)) {
+            const updates = {};
+            allItems.filter(i => i.group === gName).forEach(item => { updates[`/bills/${item.id}`] = null; });
+            
+            database.ref().update(updates).then(() => {
+                if(document.getElementById('billGroup').value === gName) document.getElementById('billGroup').value = "บิลทั่วไป";
+                
+                const modalEl = document.getElementById('modalHistory');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if(modal) modal.hide();
+
+                // บังคับเคลียร์ Backdrop และ Body Lock
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style = "";
+                
+                renderUI();
+            });
+        }
     }
 
     function editItem(id) {
@@ -254,103 +298,24 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function syncData() {
-        database.ref('.info/connected').on('value', snap => {
-            const st = document.getElementById('syncStatus');
-            st.innerText = snap.val() ? "ออนไลน์" : "ออฟไลน์";
-            st.className = `status-badge ${snap.val() ? 'bg-success' : 'bg-danger'} text-white`;
-        });
-        database.ref('bills').on('value', snap => {
-            allItems = snap.val() ? Object.values(snap.val()) : [];
-            renderUI();
-        });
-    }
-
-    function renderUI() {
-        const group = document.getElementById('billGroup').value;
-        document.querySelectorAll('.group-label-display').forEach(el => el.innerText = "GROUP: " + group);
-        const listN = document.getElementById('list-normal'), listS = document.getElementById('list-split');
-        listN.innerHTML = ''; listS.innerHTML = '';
-        let totalN = 0, totalS = 0;
-
-        allItems.filter(i => i.group === group).sort((a,b) => b.id - a.id).forEach(i => {
-            const isExp = i.type === 'expense';
-            const splitAmt = i.amt / (i.split || 1);
-            totalN += isExp ? -i.amt : i.amt; totalS += isExp ? -splitAmt : splitAmt;
-            const row = (val) => `
-                <div class="item-row">
-                    <div><b style="font-size:12px">${i.note}</b><br><small class="text-muted" style="font-size:9px">${i.date}</small></div>
-                    <div class="text-end">
-                        <span class="fw-bold ${isExp?'text-danger':'text-success'}">${isExp?'-':'+'}${val.toLocaleString()}</span><br>
-                        <div style="display:flex; gap:8px; justify-content: flex-end;">
-                            <span onclick="editItem(${i.id})" class="text-primary" style="font-size:10px; cursor:pointer;">แก้ไข</span>
-                            <span onclick="delItem(${i.id})" class="text-muted" style="font-size:10px; cursor:pointer;">ลบ</span>
-                        </div>
-                    </div>
-                </div>`;
-            listN.innerHTML += row(i.amt); listS.innerHTML += row(splitAmt);
-        });
-        document.getElementById('total-normal').innerText = totalN.toLocaleString(undefined, {minimumFractionDigits: 2});
-        document.getElementById('total-split').innerText = totalS.toLocaleString(undefined, {minimumFractionDigits: 2});
-    }
-
-    function delItem(id) { if(confirm("ลบรายการนี้?")) database.ref('bills/' + id).remove(); }
-    
-    // --- ฟังก์ชันลบทั้งกลุ่ม (ลบทุกรายการในกลุ่มนั้น) ---
-    function deleteGroup(gName) {
-        if(confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบ "บิลกลุ่ม ${gName}" ทั้งหมด? ข้อมูลจะหายถาวร!`)) {
-            const itemsToDelete = allItems.filter(i => i.group === gName);
-            const updates = {};
-            itemsToDelete.forEach(item => {
-                updates[`/bills/${item.id}`] = null;
-            });
-            database.ref().update(updates).then(() => {
-                if(document.getElementById('billGroup').value === gName) {
-                    document.getElementById('billGroup').value = "บิลทั่วไป";
-                }
-                openHistory(); // รีเฟรชหน้าคลังบิล
-                renderUI();
-            });
-        }
-    }
-
-    function resetForm() { 
-        ['desc','uPrice','mOld','mNew','rName','rPrice','editingId'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.value = '';
-        }); 
-        document.getElementById('qty').value = 1;
-        document.getElementById('eRate').value = 7;
-        document.getElementById('rSplit').value = 1;
+    function resetForm() {
+        ['desc','uPrice','mOld','mNew','rName','rPrice','editingId'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
+        document.getElementById('qty').value = 1; document.getElementById('eRate').value = 7; document.getElementById('rSplit').value = 1;
         document.getElementById('inp-date').valueAsDate = new Date();
-        calc(); 
+        calc();
     }
 
-    async function saveImg(type) {
+    async function saveImg(t) {
         const area = document.getElementById('capture-area');
-        const captureSettings = {
-            normal: { width: 360, showN: true, showS: false },
-            split: { width: 360, showN: false, showS: true },
-            dual: { width: 720, showN: true, showS: true }
-        };
-        const settings = captureSettings[type];
-        try {
-            const canvas = await html2canvas(area, { 
-                scale: 2.5, backgroundColor: "#cbd5e1", useCORS: true,
-                onclone: (clonedDoc) => {
-                    const clonedArea = clonedDoc.getElementById('capture-area');
-                    clonedArea.style.display = 'flex';
-                    clonedArea.style.width = settings.width + 'px';
-                    clonedDoc.getElementById('receipt-normal').style.display = settings.showN ? 'block' : 'none';
-                    clonedDoc.getElementById('receipt-split').style.display = settings.showS ? 'block' : 'none';
-                    clonedArea.querySelectorAll('.item-row div:last-child div').forEach(b => b.remove());
-                }
-            });
-            const link = document.createElement('a');
-            link.download = `FlowBill-${type}-${Date.now()}.png`;
-            link.href = canvas.toDataURL("image/png");
-            link.click();
-        } catch (e) { alert("บันทึกรูปไม่สำเร็จ"); }
+        const set = { normal: { w: 360, n: true, s: false }, split: { w: 360, n: false, s: true }, dual: { w: 720, n: true, s: true } }[t];
+        const canvas = await html2canvas(area, { scale: 2.5, backgroundColor: "#cbd5e1", useCORS: true, onclone: (cloned) => {
+            const cArea = cloned.getElementById('capture-area');
+            cArea.style.display = 'flex'; cArea.style.width = set.w + 'px';
+            cloned.getElementById('receipt-normal').style.display = set.n ? 'block' : 'none';
+            cloned.getElementById('receipt-split').style.display = set.s ? 'block' : 'none';
+            cloned.querySelectorAll('.item-row div:last-child div').forEach(b => b.remove());
+        }});
+        const link = document.createElement('a'); link.download = `FlowBill-${Date.now()}.png`; link.href = canvas.toDataURL(); link.click();
     }
 
     function saveEx() {
@@ -364,23 +329,17 @@
     function openHistory() {
         const groups = [...new Set(allItems.map(i => i.group))];
         document.getElementById('historyList').innerHTML = groups.map(g => `
-            <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white" style="transition:0.3s;">
-                <div onclick="setGroup('${g}')" style="cursor:pointer; flex-grow:1;">
-                    <b class="text-dark">${g}</b> 
-                    <span class="badge bg-light text-primary border ms-2">${allItems.filter(i => i.group === g).length} รายการ</span>
-                </div>
-                <button onclick="deleteGroup('${g}')" class="btn btn-sm btn-outline-danger border-0 rounded-pill px-3">🗑️ ลบทั้งกลุ่ม</button>
-            </div>
-        `).join('') || '<div class="p-4 text-center text-muted">ไม่มีข้อมูลบิลในคลัง</div>';
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-white">
+                <div onclick="setGroup('${g}')" style="cursor:pointer; flex:1;"><b>${g}</b> <span class="badge bg-primary ms-2">${allItems.filter(i => i.group === g).length}</span></div>
+                <button onclick="deleteGroup('${g}')" class="btn btn-sm btn-outline-danger border-0">🗑️ ลบกลุ่ม</button>
+            </div>`).join('') || '<div class="p-4 text-center">ไม่มีข้อมูล</div>';
         new bootstrap.Modal(document.getElementById('modalHistory')).show();
     }
 
-    function setGroup(g) { document.getElementById('billGroup').value = g; renderUI(); bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide(); }
-
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
-        });
+    function setGroup(g) { 
+        document.getElementById('billGroup').value = g; 
+        renderUI(); 
+        bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide(); 
     }
 </script>
 </body>
