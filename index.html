@@ -10,6 +10,8 @@
     <meta name="apple-mobile-web-app-title" content="FlowBill">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1e293b">
+    
+    <link rel="manifest" href="data:application/manifest+json,{'name':'FlowBill','short_name':'FlowBill','start_url':'.','display':'standalone','background_color':'#ffffff','theme_color':'#1e293b','icons':[{'src':'https://cdn.phototourl.com/free/2026-04-26-8b56e238-708c-4dc5-9c40-2c8c57f2e298.jpg','sizes':'512x512','type':'image/jpg'}]}">
 
     <link rel="apple-touch-icon" href="https://cdn.phototourl.com/free/2026-04-26-8b56e238-708c-4dc5-9c40-2c8c57f2e298.jpg">
     <link rel="icon" type="image/jpg" href="https://cdn.phototourl.com/free/2026-04-26-8b56e238-708c-4dc5-9c40-2c8c57f2e298.jpg">
@@ -69,7 +71,7 @@
 <div class="container mt-2">
     <div class="main-card">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4 class="fw-bold m-0 text-primary">FlowBill <span class="text-dark">v7.8</span></h4>
+            <h4 class="fw-bold m-0 text-primary">FlowBill <span class="text-dark">v7.9</span></h4>
             <div class="d-flex gap-2">
                 <button onclick="createNewBill()" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm">➕ เพิ่มบิลใหม่</button>
                 <button onclick="openHistory()" class="btn btn-sm btn-outline-primary rounded-pill px-3">📂 คลังบิล</button>
@@ -153,6 +155,20 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    // --- ส่วนของ Service Worker เพื่อให้ Browser ยอมรับการติดตั้งแอป ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            const blob = new Blob([`
+                self.addEventListener('fetch', function(event) {
+                    event.respondWith(fetch(event.request));
+                });
+            `], { type: 'text/javascript' });
+            const url = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(url);
+        });
+    }
+
+    // --- JavaScript เดิมของคุณ (Firebase และ UI Logic) ---
     const firebaseConfig = { databaseURL: "https://mybillapp-99a67-default-rtdb.asia-southeast1.firebasedatabase.app" };
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
@@ -224,8 +240,10 @@
     function syncData() {
         database.ref('.info/connected').on('value', snap => {
             const st = document.getElementById('syncStatus');
-            st.innerText = snap.val() ? "ออนไลน์" : "ออฟไลน์";
-            st.className = `status-badge ${snap.val() ? 'bg-success' : 'bg-danger'} text-white`;
+            if(st) {
+                st.innerText = snap.val() ? "ออนไลน์" : "ออฟไลน์";
+                st.className = `status-badge ${snap.val() ? 'bg-success' : 'bg-danger'} text-white`;
+            }
         });
         database.ref('bills').on('value', snap => {
             allItems = snap.val() ? Object.values(snap.val()) : [];
@@ -237,6 +255,7 @@
         const group = document.getElementById('billGroup').value;
         document.querySelectorAll('.group-label-display').forEach(el => el.innerText = "GROUP: " + group);
         const listN = document.getElementById('list-normal'), listS = document.getElementById('list-split');
+        if(!listN || !listS) return;
         listN.innerHTML = ''; listS.innerHTML = '';
         let tN = 0, tS = 0;
 
@@ -265,7 +284,6 @@
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if(modal) modal.hide();
 
-                // บังคับเคลียร์ Backdrop และ Body Lock
                 document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
                 document.body.classList.remove('modal-open');
                 document.body.style = "";
@@ -284,23 +302,28 @@
         document.getElementById('inp-date').value = item.date;
         document.getElementById('type').value = item.type;
         if(item.raw) {
-            document.getElementById('desc').value = item.note;
-            document.getElementById('uPrice').value = item.raw.uPrice;
-            document.getElementById('qty').value = item.raw.qty;
-            document.getElementById('mOld').value = item.raw.mOld;
-            document.getElementById('mNew').value = item.raw.mNew;
-            document.getElementById('eRate').value = item.raw.eRate;
-            document.getElementById('rName').value = item.note;
-            document.getElementById('rPrice').value = item.raw.rPrice;
-            document.getElementById('rSplit').value = item.raw.rSplit;
+            document.getElementById('desc').value = item.note || '';
+            document.getElementById('uPrice').value = item.raw.uPrice || '';
+            document.getElementById('qty').value = item.raw.qty || 1;
+            document.getElementById('mOld').value = item.raw.mOld || '';
+            document.getElementById('mNew').value = item.raw.mNew || '';
+            document.getElementById('eRate').value = item.raw.eRate || 7;
+            document.getElementById('rName').value = item.note || '';
+            document.getElementById('rPrice').value = item.raw.rPrice || '';
+            document.getElementById('rSplit').value = item.raw.rSplit || 1;
         }
         calc();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function resetForm() {
-        ['desc','uPrice','mOld','mNew','rName','rPrice','editingId'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
-        document.getElementById('qty').value = 1; document.getElementById('eRate').value = 7; document.getElementById('rSplit').value = 1;
+        ['desc','uPrice','mOld','mNew','rName','rPrice','editingId'].forEach(id => { 
+            const el = document.getElementById(id);
+            if(el) el.value = ''; 
+        });
+        document.getElementById('qty').value = 1; 
+        document.getElementById('eRate').value = 7; 
+        document.getElementById('rSplit').value = 1;
         document.getElementById('inp-date').valueAsDate = new Date();
         calc();
     }
@@ -339,7 +362,8 @@
     function setGroup(g) { 
         document.getElementById('billGroup').value = g; 
         renderUI(); 
-        bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide(); 
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalHistory'));
+        if(modal) modal.hide(); 
     }
 </script>
 </body>
