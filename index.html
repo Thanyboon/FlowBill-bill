@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FlowBill</title>
+    <title>FlowBill v8.1</title>
 
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -46,8 +46,11 @@
         .nav-link-custom.active { background: white; color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         
         .input-form { background: #f8fafc; padding: 20px; border-radius: 20px; border: 1px solid #e2e8f0; }
+        
+        /* Capture Area Styling */
         .receipt-wrapper { display: flex; gap: 15px; background: #cbd5e1; padding: 20px; border-radius: 24px; overflow-x: auto; justify-content: center; }
         .receipt-container { width: 320px; min-width: 320px; background: white; padding: 25px; border-radius: 20px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
         .item-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #e2e8f0; }
         .status-badge { font-size: 11px; padding: 5px 12px; border-radius: 20px; position: fixed; top: calc(env(safe-area-inset-top) + 12px); right: 12px; z-index: 1000; }
         
@@ -154,12 +157,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
-        });
-    }
-
+    // --- Firebase Setup ---
     const firebaseConfig = { databaseURL: "https://mybillapp-99a67-default-rtdb.asia-southeast1.firebasedatabase.app" };
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
@@ -196,6 +194,7 @@
         const id = document.getElementById('editingId').value || Date.now();
         const amt = +document.getElementById('totalDisplay').value;
         let note = "รายการ"; let splitValue = 1;
+        
         if(currentMode === 'finance') note = document.getElementById('desc').value || 'รายจ่าย';
         if(currentMode === 'electric') note = `ค่าไฟ (${(+document.getElementById('mNew').value - +document.getElementById('mOld').value)} ยู)`;
         if(currentMode === 'receipt') { note = document.getElementById('rName').value || 'หารบิล'; splitValue = +document.getElementById('rSplit').value || 1; }
@@ -209,7 +208,10 @@
                 eRate: document.getElementById('eRate').value, rPrice: document.getElementById('rPrice').value,
                 rSplit: document.getElementById('rSplit').value, mode: currentMode
             }
-        }).then(() => resetForm());
+        }).then(() => {
+            resetForm();
+            renderUI();
+        });
     }
 
     function syncData() {
@@ -230,14 +232,89 @@
         const listN = document.getElementById('list-normal'), listS = document.getElementById('list-split');
         listN.innerHTML = ''; listS.innerHTML = '';
         let tN = 0, tS = 0;
+
         allItems.filter(i => i.group === group).sort((a,b) => b.id - a.id).forEach(i => {
-            const isExp = i.type === 'expense'; const sAmt = i.amt / (i.split || 1);
-            tN += isExp ? -i.amt : i.amt; tS += isExp ? -sAmt : sAmt;
-            const row = (v) => `<div class="item-row"><div><b style="font-size:12px">${i.note}</b><br><small class="text-muted" style="font-size:9px">${i.date}</small></div><div class="text-end"><span class="fw-bold ${isExp?'text-danger':'text-success'}">${isExp?'-':'+'}${v.toLocaleString()}</span><br><div style="display:flex; gap:8px; justify-content: flex-end;"><span onclick="editItem(${i.id})" class="text-primary" style="font-size:10px; cursor:pointer;">แก้ไข</span><span onclick="delItem(${i.id})" class="text-muted" style="font-size:10px; cursor:pointer;">ลบ</span></div></div></div>`;
-            listN.innerHTML += row(i.amt); listS.innerHTML += row(sAmt);
+            const isExp = i.type === 'expense'; 
+            const sAmt = i.amt / (i.split || 1);
+            tN += isExp ? -i.amt : i.amt; 
+            tS += isExp ? -sAmt : sAmt;
+
+            const createRow = (v) => `
+                <div class="item-row">
+                    <div>
+                        <b style="font-size:12px">${i.note}</b><br>
+                        <small class="text-muted" style="font-size:9px">${i.date}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="fw-bold ${isExp?'text-danger':'text-success'}">${isExp?'-':'+'}${v.toLocaleString()}</span><br>
+                        <div style="display:flex; gap:8px; justify-content: flex-end;">
+                            <span onclick="editItem(${i.id})" class="text-primary" style="font-size:10px; cursor:pointer;">แก้ไข</span>
+                            <span onclick="delItem(${i.id})" class="text-muted" style="font-size:10px; cursor:pointer;">ลบ</span>
+                        </div>
+                    </div>
+                </div>`;
+            listN.innerHTML += createRow(i.amt); 
+            listS.innerHTML += createRow(sAmt);
         });
+
         document.getElementById('total-normal').innerText = tN.toLocaleString(undefined, {minimumFractionDigits: 2});
         document.getElementById('total-split').innerText = tS.toLocaleString(undefined, {minimumFractionDigits: 2});
+    }
+
+    // --- ฟังก์ชันบันทึกรูปภาพ (รองรับรูปคู่แนวขวางตามคำขอ) ---
+    async function saveImg(type) {
+        const area = document.getElementById('capture-area');
+        const settings = {
+            normal: { width: 360, showN: true, showS: false },
+            split: { width: 360, showN: false, showS: true },
+            dual: { width: 720, showN: true, showS: true } 
+        }[type];
+
+        try {
+            const canvas = await html2canvas(area, { 
+                scale: 2.5,
+                backgroundColor: "#cbd5e1",
+                useCORS: true,
+                onclone: (clonedDoc) => {
+                    const clonedArea = clonedDoc.getElementById('capture-area');
+                    clonedArea.style.display = 'flex';
+                    clonedArea.style.flexDirection = 'row';
+                    clonedArea.style.width = type === 'dual' ? '720px' : '360px';
+                    clonedArea.style.padding = '20px';
+                    clonedArea.style.justifyContent = 'center';
+
+                    const bNormal = clonedDoc.getElementById('receipt-normal');
+                    const bSplit = clonedDoc.getElementById('receipt-split');
+                    
+                    bNormal.style.display = settings.showN ? 'block' : 'none';
+                    bSplit.style.display = settings.showS ? 'block' : 'none';
+                    
+                    if(settings.showN) { bNormal.style.width = '320px'; bNormal.style.minWidth = '320px'; }
+                    if(settings.showS) { bSplit.style.width = '320px'; bSplit.style.minWidth = '320px'; }
+                    if(type === 'dual') { bNormal.style.marginRight = '15px'; }
+
+                    clonedArea.querySelectorAll('.item-row span').forEach(s => {
+                        if(s.innerText === "แก้ไข" || s.innerText === "ลบ") s.remove();
+                    });
+                }
+            });
+
+            const link = document.createElement('a');
+            link.download = `FlowBill-${type}-${Date.now()}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+        } catch (e) {
+            alert("บันทึกรูปไม่สำเร็จ");
+        }
+    }
+
+    function saveEx() {
+        const group = document.getElementById('billGroup').value;
+        const data = allItems.filter(i => i.group === group);
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Bills");
+        XLSX.writeFile(wb, `FlowBill-${group}-${Date.now()}.xlsx`);
     }
 
     function editItem(id) {
@@ -255,21 +332,26 @@
         window.scrollTo(0,0);
     }
 
-    function deleteGroup(gName) {
-        if(confirm(`⚠️ ลบบิลกลุ่ม "${gName}" ทั้งหมด?`)) {
-            const updates = {};
-            allItems.filter(i => i.group === gName).forEach(item => { updates[`/bills/${item.id}`] = null; });
-            database.ref().update(updates).then(() => {
-                if(document.getElementById('billGroup').value === gName) document.getElementById('billGroup').value = "บิลทั่วไป";
-                const modalEl = document.getElementById('modalHistory');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if(modal) modal.hide();
-                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style = "";
-                renderUI();
-            });
-        }
+    function delItem(id) { if(confirm("ลบรายการนี้?")) database.ref('bills/' + id).remove().then(() => renderUI()); }
+
+    function createNewBill() { 
+        if(confirm("ล้างข้อมูลเพื่อเริ่มบิลใหม่?")) { 
+            resetForm(); 
+            document.getElementById('billGroup').value = "บิลใหม่"; 
+            renderUI(); 
+        } 
+    }
+
+    function resetForm() {
+        ['desc','uPrice','mOld','mNew','rName','rPrice','editingId'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.value = '';
+        });
+        document.getElementById('qty').value = 1; 
+        document.getElementById('eRate').value = 7; 
+        document.getElementById('rSplit').value = 1;
+        document.getElementById('inp-date').valueAsDate = new Date();
+        calc();
     }
 
     function openHistory() {
@@ -285,69 +367,21 @@
     function setGroup(g) { 
         document.getElementById('billGroup').value = g; 
         renderUI(); 
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalHistory'));
-        if(modal) modal.hide(); 
+        bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide(); 
     }
 
-    function resetForm() {
-        ['desc','uPrice','mOld','mNew','rName','rPrice','editingId'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('qty').value = 1; document.getElementById('eRate').value = 7; document.getElementById('rSplit').value = 1;
-        document.getElementById('inp-date').valueAsDate = new Date();
-        calc();
-    }
-    
-    function delItem(id) { if(confirm("ลบรายการนี้?")) database.ref('bills/' + id).remove(); }
-    function createNewBill() { if(confirm("ล้างข้อมูลเพื่อเริ่มบิลใหม่?")) { resetForm(); document.getElementById('billGroup').value = "บิลใหม่"; renderUI(); } }
-
-    // --- ฟังก์ชันบันทึกรูปภาพ (รองรับ PWA/iOS/Android) ---
-    async function saveImg(t) {
-        const area = document.getElementById('capture-area');
-        const set = { 
-            normal: { w: 340, n: true, s: false }, 
-            split: { w: 340, n: false, s: true }, 
-            dual: { w: 700, n: true, s: true } 
-        }[t];
-
-        try {
-            const canvas = await html2canvas(area, { 
-                scale: 3, useCORS: true, logging: false, backgroundColor: "#cbd5e1",
-                onclone: (cloned) => {
-                    const cArea = cloned.getElementById('capture-area');
-                    cArea.style.display = 'flex'; 
-                    cArea.style.padding = '20px';
-                    cArea.style.width = set.w + 'px';
-                    cloned.getElementById('receipt-normal').style.display = set.n ? 'block' : 'none';
-                    cloned.getElementById('receipt-split').style.display = set.s ? 'block' : 'none';
-                    cloned.querySelectorAll('.item-row div:last-child div').forEach(b => b.style.display = 'none');
-                }
+    function deleteGroup(gName) {
+        if(confirm(`⚠️ ลบบิลกลุ่ม "${gName}" ทั้งหมด?`)) {
+            const updates = {};
+            allItems.filter(i => i.group === gName).forEach(item => { updates[`/bills/${item.id}`] = null; });
+            database.ref().update(updates).then(() => {
+                if(document.getElementById('billGroup').value === gName) document.getElementById('billGroup').value = "บิลทั่วไป";
+                bootstrap.Modal.getInstance(document.getElementById('modalHistory')).hide();
+                renderUI();
             });
-
-            const dataUrl = canvas.toDataURL("image/png");
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `FlowBill-${Date.now()}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            // สำหรับ iOS PWA ที่บล็อกดาวน์โหลด: เปิดรูปในหน้าใหม่ให้เซฟเอง
-            if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
-                const newWin = window.open();
-                newWin.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${dataUrl}" style="max-width:100%;"><p style="position:fixed; bottom:20px; color:white; font-family:sans-serif;">กดค้างที่รูปเพื่อบันทึกไปยังเครื่อง</p></body>`);
-            }
-        } catch (err) { alert("Error: " + err); }
-    }
-
-    function saveEx() {
-        const group = document.getElementById('billGroup').value;
-        const data = allItems.filter(i => i.group === group).map(i => ({
-            "วันที่": i.date, "รายการ": i.note, "ประเภท": i.type === 'expense' ? 'รายจ่าย' : 'รายรับ', "จำนวนเงิน": i.amt, "หารต่อคน": (i.amt / i.split).toFixed(2)
-        }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Bills");
-        XLSX.writeFile(wb, `FlowBill-${group}.xlsx`);
+        }
     }
 </script>
+
 </body>
 </html>
